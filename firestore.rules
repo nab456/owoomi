@@ -1,0 +1,55 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // Super admin UID - replace with your actual admin UID
+    function isSuperAdmin() {
+      return request.auth.uid == "YOUR_SUPER_ADMIN_UID";
+    }
+    
+    // Is the user authenticated?
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Does the user belong to the company they are trying to access?
+    function isUserFromEntreprise(entrepriseId) {
+      return exists(/databases/$(database)/documents/utilisateurs/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/utilisateurs/$(request.auth.uid)).data.entrepriseId == entrepriseId;
+    }
+    
+    // Can the user manage members of their company?
+    function canManageMembers() {
+       return exists(/databases/$(database)/documents/utilisateurs/$(request.auth.uid)) &&
+              (get(/databases/$(database)/documents/utilisateurs/$(request.auth.uid)).data.role == 'PDG' ||
+               get(/databases/$(database)/documents/utilisateurs/$(request.auth.uid)).data.role == 'gestionnaire');
+    }
+
+    // Abonnements can be read by any authenticated user, but only written by super admin
+    match /abonnements/{abonnementId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+    
+    // Entreprises can be read by their own members, but only written by super admin
+    match /entreprises/{entrepriseId} {
+      allow read: if isSuperAdmin() || isUserFromEntreprise(entrepriseId);
+      allow write: if isSuperAdmin();
+    }
+    
+    match /utilisateurs/{userId} {
+      // Any user can read their own data
+      allow get: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Users of the same company can read each other's data
+      allow list: if isAuthenticated() && isUserFromEntreprise(get(/databases/$(database)/documents/utilisateurs/$(userId)).data.entrepriseId);
+      
+      // PDG/Gestionnaire can update users in their company. Super admin can update anyone.
+      allow update: if isSuperAdmin() || (canManageMembers() && isUserFromEntreprise(resource.data.entrepriseId));
+
+      // PDG/Gestionnaire can create users in their company. Super admin can create anyone.
+      allow create: if isSuperAdmin() || canManageMembers();
+    }
+  }
+}
