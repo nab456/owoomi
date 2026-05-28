@@ -25,6 +25,7 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   register: (nom: string, email: string, pass: string) => Promise<RegisterResult>;
+  signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   loading: boolean;
 }
 
@@ -65,7 +66,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        const profile = await fetchUserProfile(session.user.id);
+        let profile = await fetchUserProfile(session.user.id);
+
+        if (!profile) {
+          const nom = session.user.user_metadata?.full_name
+            || session.user.email?.split('@')[0]
+            || 'Utilisateur';
+          const email = session.user.email!;
+
+          const { data: entreprise } = await supabase
+            .from('entreprises')
+            .insert({
+              nom: `Entreprise de ${nom}`,
+              statut: 'actif',
+              abonnement: 'gratuit',
+              date_expiration: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            })
+            .select('id')
+            .single();
+
+          if (entreprise) {
+            await supabase.from('utilisateurs').insert({
+              id: session.user.id,
+              nom,
+              email,
+              entreprise_id: entreprise.id,
+              role: 'PDG',
+              statut: 'actif',
+            });
+            profile = await fetchUserProfile(session.user.id);
+          }
+        }
+
         setUser(profile);
         if (profile?.role === 'superadmin') {
           router.push('/admin/dashboard');
@@ -130,12 +162,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { success: true };
   };
 
+  const signInWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  };
+
   const logout = () => {
     supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated: !!user, user, login, logout, register, loading }}>
+    <AuthContext.Provider value={{ isAuthenticated: !!user, user, login, logout, register, signInWithGoogle, loading }}>
       {children}
     </AuthContext.Provider>
   );

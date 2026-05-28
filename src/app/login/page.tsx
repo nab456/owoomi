@@ -24,7 +24,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('test@example.com');
   const [password, setPassword] = useState('password123');
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { login, signInWithGoogle } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -107,7 +107,7 @@ export default function LoginPage() {
                     <Button type="submit" className="w-full bg-gray-900 text-white hover:bg-gray-800">
                         Se connecter
                     </Button>
-                     <Button variant="outline" className="w-full">
+                     <Button variant="outline" className="w-full" type="button" onClick={signInWithGoogle}>
                         <GoogleIcon className="mr-2 h-4 w-4" />
                         Se connecter avec Google
                     </Button>

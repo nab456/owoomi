@@ -25,7 +25,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const { register } = useAuth();
+  const { register, signInWithGoogle } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,7 +109,7 @@ export default function RegisterPage() {
                 <Button type="submit" className="w-full bg-gray-900 text-white hover:bg-gray-800">
                   Créer un compte
                 </Button>
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full" type="button" onClick={signInWithGoogle}>
                     <GoogleIcon className="mr-2 h-4 w-4" />
                     S'inscrire avec Google
                 </Button>
